@@ -25,10 +25,27 @@ Requires macOS or Linux with `python3` (3.9+) on PATH. There are no other depend
 | `/career-memory:timeline` | Show your timeline (also saved to `~/.career-memory/timeline.md`). |
 | `/career-memory:scope allow\|disallow\|exclude\|unexclude <path>`, `pause`, `resume` | Change what gets captured. |
 | `/career-memory:connect` | Link the web app: opens the browser to approve this computer, then syncs. Later changes sync automatically. |
+| `/career-memory:instructions [change]` | Show or edit your instructions for how sessions are read (see below). |
 | `/career-memory:status` | Show scope, memory counts and the next run time. |
 | `/career-memory:uninstall` | Delete all local data. |
 
 To exclude a repo, add a `.careerignore` file at its root.
+
+## Steering it
+
+Write plain-English instructions in `~/.career-memory/instructions.md` (or ask `/career-memory:instructions <what you want>` to write them for you). They are followed in every step: what's worth remembering, how repos are grouped into projects, and how memories are written. For example:
+
+```markdown
+## Projects
+- Everything under ~/work/acme is one project called "Payments platform".
+- "playground" is throwaway experiments: never remember anything from it.
+
+## What to remember
+- I'm moving into ML infrastructure; emphasise system design and reliability.
+- Don't name the client "Contoso"; call it "a fintech client".
+```
+
+A `.careermemory.md` at a repo root adds instructions for sessions in that repo. Instructions apply to new sessions; `/career-memory:memory rebuild` and `regroup` re-apply them to existing memory. Safety rules (no secrets, no invented facts) always win.
 
 ## How it works
 

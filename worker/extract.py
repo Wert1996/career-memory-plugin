@@ -28,7 +28,7 @@ Rules:
 - text: one resume-style statement, past tense, no "I", at most 30 words, specific about the technical substance.
 - Never include secrets, credentials, personal data, URLs, or customer/employer-confidential names. Describe internal systems generically.
 - category is one of: {categories}.
-
+{guidance}
 Project hint: {project}
 
 Return ONLY a JSON object, no prose, no code fences:
@@ -97,6 +97,6 @@ def normalize(data: dict) -> dict:
     return {"summary": str(data.get("summary", ""))[:500], "claims": claims}
 
 
-def extract(log: str, project: str, model: str, claude_bin: str, workdir: str, timeout: int = 600) -> dict:
-    prompt = PROMPT.format(categories=", ".join(CATEGORIES), project=project or "unknown", log=log)
+def extract(log: str, project: str, model: str, claude_bin: str, workdir: str, timeout: int = 600, guidance: str = "") -> dict:
+    prompt = PROMPT.format(categories=", ".join(CATEGORIES), project=project or "unknown", log=log, guidance=guidance)
     return normalize(parse_json(call_claude(prompt, model, claude_bin, workdir, timeout)))

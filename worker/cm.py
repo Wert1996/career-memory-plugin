@@ -8,6 +8,7 @@
   cm.py forget IDS | rebuild [PROJECT]            drop items / rebuild project memory from the log
   cm.py connect [URL] [TOKEN] | sync              link to the web app (browser approval), push memory
   cm.py work PATH --org NAME                     tag sessions under PATH as work for NAME
+  cm.py instructions                             show/create ~/.career-memory/instructions.md
   cm.py uninstall --yes                          delete all local data
 """
 from __future__ import annotations
@@ -26,6 +27,7 @@ from typing import List, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import guidance  # noqa: E402
 from extract import ExtractionError, call_claude, extract  # noqa: E402
 from memory import merge, regroup, resolve  # noqa: E402
 from scrub import scrub  # noqa: E402
@@ -253,8 +255,9 @@ def cmd_run(args) -> None:
 
             try:
                 summary, claims = "", []
+                steer = guidance.load(HOME, git_root(ep.cwd))
                 for part in chunks(text, MAX_CHUNK_CHARS):
-                    res = extract(part, project, cfg["model"], claude_bin, workdir)
+                    res = extract(part, project, cfg["model"], claude_bin, workdir, guidance=steer)
                     summary = summary or res["summary"]
                     claims += res["claims"]
             except (ExtractionError, ValueError) as e:
@@ -301,7 +304,8 @@ def update_memories(store: Store, cfg: dict, claude_bin: str, workdir: str, only
             continue
         current = store.memory(project)
         try:
-            res = merge(current["content"] if current else "", claims, project, claims[-1]["organization"], call)
+            res = merge(current["content"] if current else "", claims, project, claims[-1]["organization"], call,
+                        guidance=guidance.load(HOME))
         except (ExtractionError, ValueError) as e:
             log(f"memory merge failed for {project}: {e}")
             continue  # claims stay unmerged; retried next run
@@ -326,7 +330,7 @@ def resolve_workspaces(store: Store, min_sig: int, call) -> None:
             store.set_alias(w, w)
         else:
             try:
-                project = resolve(summaries[w], existing, call)
+                project = resolve(summaries[w], existing, call, guidance=guidance.load(HOME))
             except (ExtractionError, ValueError) as e:
                 log(f"project grouping failed for {w} (kept separate for now): {e}")
                 continue
@@ -362,7 +366,8 @@ def cmd_regroup(args) -> None:
     if not summaries:
         return print("Nothing remembered yet.")
     wd = os.path.join(HOME, "tmp"); os.makedirs(wd, exist_ok=True)
-    mapping = regroup(summaries, lambda prompt: call_claude(prompt, cfg["model"], claude_bin_of(cfg), wd))
+    mapping = regroup(summaries, lambda prompt: call_claude(prompt, cfg["model"], claude_bin_of(cfg), wd),
+                      guidance=guidance.load(HOME))
     groups = defaultdict(list)
     for w, p in mapping.items():
         groups[p].append(w)
@@ -620,6 +625,17 @@ def cmd_work(args) -> None:
     print("Work paths:", json.dumps(cfg["work_paths"], indent=2))
 
 
+def cmd_instructions(args) -> None:
+    p = guidance.ensure(HOME)
+    active = guidance.load(HOME)
+    print(f"Instructions file: {p}")
+    print(f"Per-repo: add a {guidance.REPO_FILE} at a repo root (applies to sessions in that repo).")
+    print("Active instructions:" if active else "No active instructions yet (only the commented examples).")
+    if active:
+        with open(p, encoding="utf-8") as f:
+            print(guidance._clean(f.read()))
+
+
 def cmd_uninstall(args) -> None:
     if not args.yes:
         sys.exit(f"This deletes {HOME} (all claims and settings). Re-run with --yes.")
@@ -651,6 +667,7 @@ def main() -> None:
     sub.add_parser("resume").set_defaults(fn=cmd_pause(True))
     s = sub.add_parser("connect"); s.add_argument("url", nargs="?"); s.add_argument("token", nargs="?"); s.set_defaults(fn=cmd_connect)
     sub.add_parser("sync").set_defaults(fn=cmd_sync)
+    sub.add_parser("instructions").set_defaults(fn=cmd_instructions)
     s = sub.add_parser("work"); s.add_argument("path"); s.add_argument("--org", default=None)
     s.add_argument("--remove", action="store_true"); s.set_defaults(fn=cmd_work)
     s = sub.add_parser("uninstall"); s.add_argument("--yes", action="store_true"); s.set_defaults(fn=cmd_uninstall)

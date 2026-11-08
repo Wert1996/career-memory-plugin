@@ -19,6 +19,7 @@ How to merge:
 - Never invent facts, metrics, users or impact. Never include secrets, URLs, people's names or confidential details.
 - Keep dates: end every bullet in Built, Hard problems solved and Decisions with when it happened, as "(YYYY-MM)" or "(YYYY-MM to YYYY-MM)", taken from the item dates. When merging items, the range covers them all.
 - Stay compact: at most ~400 words in total, no more than ~8 lines in "Built".
+{guidance}
 
 Format (Markdown, omit empty sections):
 ## Overview
@@ -55,7 +56,7 @@ def _items(claims) -> str:
 
 
 def merge(current: str, claims: List, project: str, organization: str | None,
-          call: Callable[[str], str]) -> dict:
+          call: Callable[[str], str], guidance: str = "") -> dict:
     """Merge claims (sqlite rows) into the current memory. `call` runs one LLM prompt."""
     out = {"memory": current, "one_liner": ""}
     for i in range(0, len(claims), BATCH):
@@ -64,6 +65,7 @@ def merge(current: str, claims: List, project: str, organization: str | None,
             org=f" (at {organization})" if organization else "",
             current=out["memory"] or "(empty: this is the first work recorded)",
             items=_items(claims[i : i + BATCH]),
+            guidance=guidance,
         )
         data = parse_json(call(prompt))
         memory = str(data.get("memory", "")).strip()
@@ -90,6 +92,7 @@ def _ws(s: dict) -> str:
 RESOLVE_PROMPT = """You organise a software engineer's work memory into projects.
 
 {rules}
+{guidance}
 
 EXISTING PROJECTS:
 {projects}
@@ -101,14 +104,14 @@ Does the new workspace belong to one of the existing projects? Return ONLY a JSO
 """
 
 
-def resolve(summary: dict, projects: List, call: Callable[[str], str]) -> str:
+def resolve(summary: dict, projects: List, call: Callable[[str], str], guidance: str = "") -> str:
     """Pick the project a new workspace belongs to. `projects` are memory rows (project, organization, one_liner, first_at, last_at)."""
     lines = []
     for p in projects:
         org = f" (at {p['organization']})" if p["organization"] else ""
         lines.append(f"- {p['project']}{org}, {_when(p['first_at'])} to {_when(p['last_at'])}: {p['one_liner'] or ''}")
     listing = "\n".join(lines)
-    data = parse_json(call(RESOLVE_PROMPT.format(rules=GROUP_RULES, projects=listing, workspace=_ws(summary))))
+    data = parse_json(call(RESOLVE_PROMPT.format(rules=GROUP_RULES, guidance=guidance, projects=listing, workspace=_ws(summary))))
     name = str(data.get("project", "")).strip()[:80]
     return name or summary["workspace"]
 
@@ -116,6 +119,7 @@ def resolve(summary: dict, projects: List, call: Callable[[str], str]) -> str:
 REGROUP_PROMPT = """You organise a software engineer's work memory into projects.
 
 {rules}
+{guidance}
 
 Group ALL of these workspaces into projects. Every workspace appears in exactly one project.{pinned}
 
@@ -126,12 +130,12 @@ Return ONLY a JSON object, no code fences: {{"projects": [{{"name": "...", "work
 """
 
 
-def regroup(summaries: List[dict], call: Callable[[str], str]) -> dict:
+def regroup(summaries: List[dict], call: Callable[[str], str], guidance: str = "") -> dict:
     """Return {workspace: project} for every workspace in `summaries`."""
     pinned = [s for s in summaries if s.get("manual")]
     note = ("\nThese were set by the engineer and must stay as given: " +
             "; ".join(f"{s['workspace']} -> {s['manual']}" for s in pinned)) if pinned else ""
-    data = parse_json(call(REGROUP_PROMPT.format(rules=GROUP_RULES, pinned=note,
+    data = parse_json(call(REGROUP_PROMPT.format(rules=GROUP_RULES, guidance=guidance, pinned=note,
                                                  workspaces="\n".join(_ws(s) for s in summaries))))
     out = {}
     for p in data.get("projects") or []:
