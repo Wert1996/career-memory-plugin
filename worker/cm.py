@@ -37,7 +37,7 @@ HOME = os.environ.get("CAREER_MEMORY_HOME", os.path.expanduser("~/.career-memory
 CLAUDE_PROJECTS = os.environ.get("CAREER_MEMORY_TRANSCRIPTS", os.path.expanduser("~/.claude/projects"))
 CONFIG = os.path.join(HOME, "config.json")
 MAX_CHUNK_CHARS = 40_000
-DEFAULT_APP = os.environ.get("CAREER_MEMORY_APP", "https://career.anshumaan.space")
+DEFAULT_APP = os.environ.get("CAREER_MEMORY_APP", "https://career-memory.anshumaan.space")
 CONNECT_WAIT = 100  # seconds to poll per run; stays under Claude Code's command timeout
 
 DEFAULTS = {

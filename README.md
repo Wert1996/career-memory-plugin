@@ -2,7 +2,7 @@
 
 A Claude Code plugin that quietly turns your coding sessions into a condensed memory of what you've built, per project. There is nothing to review: it decides what's worth remembering and keeps the rest out.
 
-Everything runs on your machine. Extraction uses your own Claude Code (`claude -p`). Nothing leaves your computer unless you connect the web app ([career.anshumaan.space](https://career.anshumaan.space)), which then receives only the condensed project memories and items, never transcripts or code.
+Everything runs on your machine. Extraction uses your own Claude Code (`claude -p`). Nothing leaves your computer unless you connect the web app ([career-memory.anshumaan.space](https://career-memory.anshumaan.space)), which then receives only the condensed project memories and items, never transcripts or code.
 
 ## Install
 
