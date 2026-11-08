@@ -567,41 +567,70 @@ def _finish_connect(cfg: dict, url: str, token: str) -> None:
     print(f"Synced {res['sent']} item(s) and {res['memories']} project memories. See {cfg['api_url']}/memory")
 
 
+def _callback_server():
+    """A one-shot HTTP server on 127.0.0.1 that receives the browser's hand-off after approval."""
+    import http.server
+    import threading
+    from urllib.parse import parse_qs, urlparse
+
+    got = {}
+    done = threading.Event()
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            q = parse_qs(urlparse(self.path).query)
+            if urlparse(self.path).path == "/callback" and q.get("code"):
+                got["code"] = q["code"][0]
+                done.set()
+                body = b"<html><body style='font-family:system-ui;padding:40px'><h3>Connected</h3><p>You can close this tab and go back to Claude Code.</p></body></html>"
+                self.send_response(200)
+            else:
+                body = b"Not found"
+                self.send_response(404)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv, got, done
+
+
 def cmd_connect(args) -> None:
     cfg = require_config()
     url = (args.url or cfg.get("api_url") or DEFAULT_APP).rstrip("/")
     if args.token:  # manual token from Settings → API tokens
         return _finish_connect(cfg, url, args.token)
-    pending = cfg.get("pending_connect")
-    if not pending or pending.get("url") != url or pending.get("expires_at", 0) < time.time():
+    srv, got, done = _callback_server()
+    try:
         try:
-            d = device_start(url)
+            d = device_start(url, srv.server_address[1])
         except SyncError as e:
             sys.exit(f"Could not connect: {e}")
-        pending = {"url": url, "device_code": d["device_code"], "user_code": d["user_code"],
-                   "verify": d["verification_uri"], "expires_at": time.time() + d["expires_in"], "interval": d.get("interval", 3)}
-        cfg["pending_connect"] = pending
-        save_config(cfg)
+        opened = False
         try:
             import webbrowser
-            webbrowser.open(pending["verify"])
+            opened = webbrowser.open(d["verification_uri"])
         except Exception:
             pass
-    print(f"Approve this computer in your browser: {pending['verify']}")
-    print(f"Code: {pending['user_code']} (check it matches)")
-    sys.stdout.flush()
-    deadline = time.time() + CONNECT_WAIT
-    while time.time() < deadline:
+        print(("Opened your browser. " if opened else "") + f"Approve the connection at: {d['verification_uri']}")
+        sys.stdout.flush()
+        if not done.wait(CONNECT_WAIT):
+            sys.exit("Timed out waiting for approval. Run /career-memory:connect again.")
         try:
-            token = device_poll(url, pending["device_code"])
+            token = device_poll(url, d["device_code"], got["code"])
         except SyncError as e:
-            cfg.pop("pending_connect", None)
-            save_config(cfg)
             sys.exit(f"Could not connect: {e}. Run /career-memory:connect again.")
-        if token:
-            return _finish_connect(cfg, url, token)
-        time.sleep(pending["interval"])
-    print("Still waiting for approval. After approving in the browser, run /career-memory:connect again to finish.")
+        if not token:
+            sys.exit("Approval didn't complete. Run /career-memory:connect again.")
+        cfg.pop("pending_connect", None)
+        _finish_connect(cfg, url, token)
+    finally:
+        srv.shutdown()
 
 
 def cmd_sync(args) -> None:

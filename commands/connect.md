@@ -5,10 +5,10 @@ allowed-tools: Bash(python3:*)
 ---
 Arguments: `$ARGUMENTS` (optional: an app URL, and optionally a `cm_…` token from Settings → API tokens).
 
-Run:
+Before running it, tell the user in one line: "Opening your browser: click Approve there." Then run (it waits up to about two minutes for the approval):
 
 `python3 "${CLAUDE_PLUGIN_ROOT}/worker/cm.py" connect $ARGUMENTS`
 
-It opens the browser to approve this computer and waits for up to two minutes. Tell the user to check the code in the browser matches the one printed, and approve. If it reports it is still waiting, ask the user to approve and then run `/career-memory:connect` again to finish.
+If the browser didn't open, show the user the approval URL from the output. If it timed out, say so and suggest running `/career-memory:connect` again.
 
 Report the result in one or two lines. Never repeat a token back in your reply.

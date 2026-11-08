@@ -49,16 +49,19 @@ def _post_public(base: str, path: str, body: dict) -> tuple:
         raise SyncError(f"cannot reach {base}: {e}") from e
 
 
-def device_start(base: str) -> dict:
-    status, data = _post_public(base, "/device/start", {})
+def device_start(base: str, port: Optional[int] = None) -> dict:
+    status, data = _post_public(base, "/device/start", {"port": port} if port else {})
     if status != 200 or not data.get("device_code"):
         raise SyncError(f"could not start connecting (HTTP {status})")
     return data
 
 
-def device_poll(base: str, device_code: str) -> Optional[str]:
+def device_poll(base: str, device_code: str, exchange: Optional[str] = None) -> Optional[str]:
     """The API token once approved, None while pending. Raises SyncError when expired."""
-    status, data = _post_public(base, "/device/token", {"device_code": device_code})
+    body = {"device_code": device_code}
+    if exchange:
+        body["exchange"] = exchange
+    status, data = _post_public(base, "/device/token", body)
     if status == 200 and data.get("token"):
         return data["token"]
     if status == 202:
