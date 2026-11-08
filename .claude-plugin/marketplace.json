@@ -1,0 +1,12 @@
+{
+  "name": "career-memory",
+  "owner": { "name": "Wert1996" },
+  "metadata": { "description": "Career Memory: turn Claude Code sessions into a condensed memory of what you've built." },
+  "plugins": [
+    {
+      "name": "career-memory",
+      "source": "./",
+      "description": "Turns your Claude Code sessions into a private, condensed record of your professional work."
+    }
+  ]
+}
